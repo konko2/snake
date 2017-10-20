@@ -13,7 +13,7 @@ WELCOME_TEXT = """
     """
 
 
-class _WindowState():
+class _WindowState:
     def __init__(self, window, speed_box, length_box, height_box):
         self.window = window
         self.speed_box = speed_box

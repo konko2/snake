@@ -40,5 +40,5 @@ class QuitError(Exception):
     code = 2
 
 
-class ImagesError(Exception):
+class ImagesDimensionError(Exception):
     code = 3
