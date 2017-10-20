@@ -3,7 +3,6 @@ from PIL import Image
 from PIL.ImageTk import PhotoImage
 
 from constraints import Direction, ImagesPath
-from exceptions import ImagesDimensionError
 
 
 class Board(Canvas):
@@ -11,7 +10,8 @@ class Board(Canvas):
         self.length = length
         self.height = height
 
-        self.images, self.pixels_in_field = Board.loading_images()
+        self.pixels_in_field = ImagesPath.get_images_size()
+        self.images = Board.loading_images()
 
         self.length_px = length * self.pixels_in_field
         self.height_px = height * self.pixels_in_field
@@ -28,14 +28,13 @@ class Board(Canvas):
 
     @staticmethod
     def loading_images():
-
         head_right = Image.open(ImagesPath.SNAKE_HEAD_RIGHT.value)
         body_vertical = Image.open(ImagesPath.SNAKE_BODY_VERTICAL.value)
         body_right_down = Image.open(ImagesPath.SNAKE_BODY_RIGHT_DOWN.value)
         tail_right = Image.open(ImagesPath.SNAKE_TAIL_RIGHT.value)
         egg = Image.open(ImagesPath.EGG.value)
 
-        images = dict()
+        images = {'egg': PhotoImage(image=egg)}
         images['snake'] = {
             'head': {
                 Direction.RIGHT: PhotoImage(image=head_right),
@@ -60,156 +59,154 @@ class Board(Canvas):
                 Direction.DOWN: PhotoImage(image=tail_right.rotate(270))
             }
         }
-        images['egg'] = PhotoImage(image=egg)
 
-        list_of_images = \
-            [images['egg'], ] + \
-            list(images['snake']['head'].values()) + \
-            list(images['snake']['body'].values())
-        images_size = set((image.width(), image.height()) for image in list_of_images)
-        size = images_size.pop()
-
-        if images_size or size[0] != size[1]:
-            raise ImagesDimensionError
-
-        return images, size[0]
-
-    @staticmethod
-    def rotate_image(image):
-        pass
+        return images
 
     def create_image(self, coords, image):
         return super().create_image(*coords, image=image, anchor='nw')
 
-    def find_next_field_coords(self, direction, field):
-        result = list(field)
+    def find_next_field(self, direction, field):
+        new_field = list(field)
 
         if direction == Direction.RIGHT:
-            result[0] += self.pixels_in_field
+            new_field[0] += self.pixels_in_field
 
         elif direction == Direction.UP:
-            result[1] -= self.pixels_in_field
+            new_field[1] -= self.pixels_in_field
 
         elif direction == Direction.LEFT:
-            result[0] -= self.pixels_in_field
+            new_field[0] -= self.pixels_in_field
 
         elif direction == Direction.DOWN:
-            result[1] += self.pixels_in_field
+            new_field[1] += self.pixels_in_field
 
-        result = result[0] % self.length_px, result[1] % self.height_px
-        return result
+        return [new_field[0] % self.length_px, new_field[1] % self.height_px]
 
-    def find_center_coords(self):
-        return (
-            self.min_field_coords[0] + self.pixels_in_field * (self.length // 2),
-            self.min_field_coords[1] + self.pixels_in_field * (self.height // 2)
-        )
+    def find_center_field(self):
+        return [
+            self.min_field[0] + self.pixels_in_field * (self.length // 2),
+            self.min_field[1] + self.pixels_in_field * (self.height // 2)
+        ]
 
-    def all_fields_coords(self):
-        return [(
-            self.min_field_coords[0] + i * self.pixels_in_field,
-            self.min_field_coords[1] + j * self.pixels_in_field,
-        ) for i in range(self.length) for j in range(self.height)]
+    def all_fields(self):
+        return [[
+            self.min_field[0] + i * self.pixels_in_field,
+            self.min_field[1] + j * self.pixels_in_field,
+        ] for i in range(self.length) for j in range(self.height)]
 
-    def find_free_fields_coords(self, snake):
-        busy_fields = [tuple(map(int, self.coords(field))) for field in snake]
-        return [i for i in self.all_fields_coords() if i not in busy_fields]
+    def find_free_fields(self, list_of_obj):
+        busy_fields = [self.coords(obj) for obj in list_of_obj]
+        return [i for i in self.all_fields() if i not in busy_fields]
 
-    min_field_coords = (3, 3)
+    min_field = [3, 3]
 
 
 class Snake(list):
-    def __init__(self, board, head_field_coords, length=3):
+    def __init__(self, board, head_field):
         self.board = board
         self.images = board.images['snake']
 
-        body = [board.create_image(head_field_coords, self.images['head'][self.direction]), ]
-        for _ in range(length-1):
-            body.append(board.create_image(
-                board.find_next_field_coords(Direction.LEFT, board.coords(body[-1])),
-                self.images['body'][Direction.LEFT],
-            ))
-        board.itemconfigure(body[-1], image=self.images['tail'][self.direction])
+        reverse_direction = self.direction.find_reverse_direction()
+
+        body_fields = [head_field, ]
+        for _ in range(2):
+            body_fields += [board.find_next_field(
+                reverse_direction,
+                body_fields[-1]
+            )]
+
+        body = map(
+            lambda field, body_part: board.create_image(
+                field,
+                self.images[body_part][self.direction]
+            ),
+            body_fields,
+            ['head', 'body', 'tail']
+        )
+
         super().__init__(body)
 
     def __delitem__(self, key):
         if isinstance(key, slice):
             self.board.delete(*self[key])
-            first_field_index = key.start
+            tail_index = key.start - 1
         else:
             self.board.delete(self[key])
-            first_field_index = key
+            tail_index = key - 1
 
-        snakes_tail_direction = next(
-            direction for direction in Direction
-            if tuple(
-                int(coord) for coord in self.board.coords(self[first_field_index-2])
-            ) == self.board.find_next_field_coords(
-                direction,
-                self.board.coords(self[first_field_index-1])
-            )
+        body_direction = self.get_body_direction(tail_index)
+        self.board.itemconfigure(
+            self[tail_index],
+            image=self.images['tail'][body_direction]
         )
-        self.board.itemconfigure(self[first_field_index-1], image=self.images['tail'][snakes_tail_direction])
 
         super().__delitem__(key)
 
+    def get_body_direction(self, index):
+        if index == 1 or index == -len(self):
+            return self.direction
+
+        field = self.board.coords(self[index])
+        next_field = self.board.coords(self[index-1])
+        direction_to_neighbors = {
+            tuple(self.board.find_next_field(d, field)): d for d in Direction
+        }
+
+        return direction_to_neighbors[tuple(next_field)]
+
     def change_direction(self, new_direction):
-        if self.is_direction_changed or self.direction == new_direction or self.direction.is_symmetric(new_direction):
+        if self.is_direction_changed:
+            return
+        elif self.direction == new_direction:
+            return
+        elif self.direction.is_reverse(new_direction):
             return
 
         self.is_direction_changed = True
         self.changed_direction = new_direction
 
     def is_eat(self, obj):
-        if self.board.coords(self[0]) == self.board.coords(obj.body):
+        if self.board.coords(self[0]) == self.board.coords(obj):
             return True
         return False
 
-    # TODO: if snake eat tail, one field don't need to delete
     def delete_bitten_tail(self):
+        head_field, *body_fields = [self.board.coords(field) for field in self]
         try:
-            head_coords = self.board.coords(self[0])
-            index_of_eaten_field = [
-                self.board.coords(field) for field in self[1:]
-            ].index(head_coords)
-
-            del self[index_of_eaten_field:]
+            eaten_field_index = body_fields.index(head_field)
+            del self[eaten_field_index:]
         except ValueError:
             return
 
     def move(self):
-        image_field_after_head = self.images['body'][self.direction]
-
         if self.is_growing:
             del self.is_growing
         else:
             del self[-1]
 
+        image_field_after_head = self.images['body'][self.direction]
+
         if self.is_direction_changed:
-            image_field_after_head = self.images['body'][
-                frozenset((self.direction.find_symmetric_direction(), self.changed_direction))]
+            body_reverse_direction = self.direction.find_reverse_direction()
+            body_corners = frozenset((body_reverse_direction, self.changed_direction))
+            image_field_after_head = self.images['body'][body_corners]
 
             self.direction = self.changed_direction
             del self.changed_direction, self.is_direction_changed
 
-        self.board.itemconfigure(self[0], image=image_field_after_head)
-
-        self.insert(0, self.board.create_image(
-            self.board.find_next_field_coords(self.direction, self.board.coords(self[0])),
+        next_head_field = self.board.find_next_field(
+            self.direction,
+            self.board.coords(self[0])
+        )
+        head = self.board.create_image(
+            next_head_field,
             self.images['head'][self.direction]
-        ))
+        )
+        self.insert(0, head)
+
+        self.board.itemconfigure(self[1], image=image_field_after_head)
 
     is_growing = False
     is_direction_changed = False
     changed_direction = None
     direction = Direction.RIGHT
-
-
-class Egg:
-    def __init__(self, board, field_coords):
-        self.board = board
-        self.image = board.images['egg']
-        self.body = board.create_image(field_coords, self.image)
-
-    def __del__(self):
-        self.board.delete(self.body)

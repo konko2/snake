@@ -81,8 +81,16 @@ def create_preference_window():
     length_box.grid(row=1, column=3), height_box.grid(row=2, column=3)
 
     state = _WindowState(tk, speed_box, length_box, height_box)
-    Button(tk, text="Start!", command=state.pressing_start).grid(row=3, column=0, columnspan=2)
-    Button(tk, text="Quit", command=state.pressing_quit).grid(row=3, column=2, columnspan=2)
+    Button(
+        tk,
+        text="Start!",
+        command=state.pressing_start
+    ).grid(row=3, column=0, columnspan=2)
+    Button(
+        tk,
+        text="Quit",
+        command=state.pressing_quit
+    ).grid(row=3, column=2, columnspan=2)
 
     tk.mainloop()
 
