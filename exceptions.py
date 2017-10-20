@@ -38,7 +38,3 @@ class WrongHeightError(InitialDataError):
 
 class QuitError(Exception):
     code = 2
-
-
-class ImagesDimensionError(Exception):
-    code = 3
