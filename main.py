@@ -1,16 +1,13 @@
-from tkinter import *
 from random import choice
+from tkinter import Tk, TclError
 
-from objects import Snake, Board
 from constraints import Direction
+from objects import Snake, Board
 from welcome_window import create_preference_window
-from exceptions import QuitError
-
 
 try:
     speed, length, height = create_preference_window()
 
-    # TODO: button quit in upper menu, button 'back to preference window'
     tk = Tk()
     tk.title("snake")
     tk.resizable(False, False)
@@ -19,10 +16,7 @@ try:
     board.pack()
 
     snake = Snake(board, board.find_center_field())
-
-    free_fields = board.find_free_fields(snake)
-    egg = board.create_image(choice(free_fields), board.images['egg'])
-
+    egg = None
 
     def finish_step():
         tk.quit()
@@ -50,5 +44,5 @@ try:
         tk.bind('<Right>', lambda _: snake.change_direction(Direction.RIGHT))
         tk.mainloop()
 
-except QuitError:
+except TclError:
     pass
