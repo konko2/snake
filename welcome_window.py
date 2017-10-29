@@ -1,16 +1,29 @@
-from tkinter import *
+from tkinter import Tk, TclError, Label, Spinbox, Entry, Button
 from tkinter.messagebox import showerror
 
-from constraints import Speed, LengthConfines, HeightConfines
-from exceptions import InitialDataError, SmallLengthError, SmallHeightError, BigLengthError, BigHeightError, \
-    WrongLengthError, WrongHeightError, QuitError
-
+from constraints import Speed, PIXELS_IN_FIELD, MINIMAL_LENGTH, MAXIMAL_LENGTH, MINIMAL_HEIGHT, MAXIMAL_HEIGHT
 
 WELCOME_TEXT = """
-    This is a snake game.\n
-    Choose some preference and press 'Start!'.\n
+    This is a snake game. \n
+    Choose some preference and press 'Start!'.
     To quit press 'Quit'.
     """
+
+MESSAGE_SMALL_LENGTH = "Too small length, please choose bigger than {}"
+MESSAGE_BIG_LENGTH = "Too big length, please choose smaller than {}"
+MESSAGE_NON_INT_LENGTH = "Please write integer length"
+MESSAGE_SMALL_HEIGHT = "Too small height, please choose bigger than {}"
+MESSAGE_BIG_HEIGHT = "Too big height, please choose smaller than {}"
+MESSAGE_NON_INT_HEIGHT = "Please write integer height"
+
+
+class InitialDataError(Exception):
+    def __init__(self, message, confine=None):
+        self.message = message
+        self.confine = confine
+
+    def __str__(self):
+        return self.message.format(self.confine)
 
 
 class _WindowState:
@@ -20,12 +33,19 @@ class _WindowState:
         self.length_box = length_box
         self.height_box = height_box
 
+        self.minimal_length = MINIMAL_LENGTH
+        self.minimal_height = MINIMAL_HEIGHT
+        self.maximal_length = MAXIMAL_LENGTH if MAXIMAL_LENGTH else \
+            window.winfo_screenwidth() // PIXELS_IN_FIELD
+        self.maximal_height = MAXIMAL_HEIGHT if MAXIMAL_HEIGHT else \
+            window.winfo_screenheight() // PIXELS_IN_FIELD
+
     def pressing_start(self):
         try:
             self.check_values()
             self.window.destroy()
         except InitialDataError as error:
-            showerror('', error.message)
+            showerror('', str(error))
 
     def pressing_quit(self):
         self.quit = True
@@ -36,22 +56,22 @@ class _WindowState:
         height = self.height_box.get()
 
         if not length.isnumeric():
-            raise WrongLengthError
+            raise InitialDataError(MESSAGE_NON_INT_LENGTH)
 
         length = int(length)
-        if length < LengthConfines.MINIMAL.value:
-            raise SmallLengthError
-        if length > LengthConfines.MAXIMAL.value:
-            raise BigLengthError
+        if length < self.minimal_length:
+            raise InitialDataError(MESSAGE_SMALL_LENGTH, self.minimal_length)
+        if length > self.maximal_length:
+            raise InitialDataError(MESSAGE_BIG_LENGTH, self.maximal_length)
 
         if not height.isnumeric():
-            raise WrongHeightError
+            raise InitialDataError(MESSAGE_NON_INT_HEIGHT)
 
         height = int(height)
-        if height < HeightConfines.MINIMAL.value:
-            raise SmallHeightError
-        if height > HeightConfines.MAXIMAL.value:
-            raise BigHeightError
+        if height < self.minimal_height:
+            raise InitialDataError(MESSAGE_SMALL_HEIGHT, self.minimal_height)
+        if height > self.maximal_height:
+            raise InitialDataError(MESSAGE_BIG_HEIGHT, self.maximal_height)
 
         str_speed = self.speed_box.get()
         speed = next(s for s in Speed if str(s) == str_speed).value
@@ -95,7 +115,7 @@ def create_preference_window():
     tk.mainloop()
 
     if state.quit:
-        raise QuitError
+        raise TclError
 
     return state.checked_values
 
@@ -103,5 +123,5 @@ def create_preference_window():
 if __name__ == '__main__':
     try:
         print(create_preference_window())
-    except QuitError:
+    except TclError:
         print('Done')
