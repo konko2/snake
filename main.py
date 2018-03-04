@@ -12,7 +12,7 @@ try:
     tk.title("snake")
     tk.resizable(False, False)
 
-    board = Board(tk, length, height)
+    board = Board(tk, length, height, bg='white')
     board.pack()
 
     snake = Snake(board, board.find_center_field())
